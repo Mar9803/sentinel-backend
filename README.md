@@ -1,6 +1,6 @@
 # 🛡️ SentinelGraph AI - Fraud Detection Engine
 
-**SentinelGraph** is an advanced analytical engine that combines **Graph Theory** and **Machine Learning** to identify anomalies in massive financial datasets. It utilizes a hybrid pipeline: extracting structural features via NetworkX (PageRank, Clustering) and processing them through an Isolation Forest model for robust outlier detection.
+**SentinelGraph** is an analytical engine that combines **Graph Theory** and **Machine Learning** to identify anomalies in massive financial datasets. It utilizes a hybrid pipeline: extracting structural features via NetworkX (PageRank, Clustering) and processing them through an Isolation Forest model for robust outlier detection.
 
 ---
 
@@ -40,6 +40,57 @@
 │                     └──────────────────────┘                │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
+
+---
+
+## ⚙️ Key Components
+
+#### 1. **Detection Pipeline** (`src/`)
+
+**GraphAnalysisEngine** (`graph_analysis.py`):
+- Uses `NetworkX` to construct a similarity network of transactions.
+- Extracts structural features: **PageRank** (node importance) and **Clustering Coefficient** (local density).
+
+**IsolationForestModel** (`model.py`):
+- Uses `Scikit-Learn` implementation of the **Isolation Forest** algorithm.
+- Performs unsupervised anomaly detection by isolating outliers in the high-dimensional feature space.
+
+**TransactionRanker** (Core Logic):
+- **Input**: Raw Transaction Data (`CSV`).
+- **Output**: Flagged Anomalies with `anomaly_score`.
+- **Process**:
+  1. Data Cleaning & Feature Scaling.
+  2. Structural Feature Extraction (Graph Metrics).
+  3. ML Inference (Isolation Forest).
+  4. Final Ranking based on Anomaly Probability.
+
+
+#### 2. **Storage & Data Handling** (`models/`)
+
+**In-Memory Model Store**:
+- Loads the pre-trained `.pkl` model at startup for near-zero latency inference.
+- Handles massive dataframes using `Pandas` and `NumPy` for efficient vectorized operations.
+
+#### 3. **API Layer** (`main.py`)
+
+**POST `/analyze`**:
+- Accepts `multipart/form-data` (CSV).
+- Orchestrates the full pipeline (Graph + ML).
+- Returns detailed results including graph metrics and anomaly scores.
+
+**GET `/api/stats`**:
+- Returns cumulative metrics: `total_processed`, `flagged_suspicious`, and `system_health`.
+
+#### 4. **Frontend Dashboard** (`astro-frontend/`)
+
+- Built with **Astro** for extreme performance.
+- Decoupled architecture communicating via REST API.
+- Real-time visualization of transaction clusters and flagged outliers.
+
+---
+
+
+
 🛠️ Tech Stack
 Backend: FastAPI (Python 3.11+)
 
@@ -80,19 +131,20 @@ Bash
 uvicorn main:app --reload
 API live at http://127.0.0.1:8000. Interactive Swagger UI at /docs.
 
-📄 API Reference
-Analyze Transactions
-POST /analyze
+---
 
-Purpose: Ingests a CSV batch of financial records for real-time anomaly detection.
+## 📄 API Reference
 
-Request Body:
+### Analyze Transactions
+`POST` `/analyze`
 
-file: multipart/form-data (Standard CSV file)
+> **Purpose**: Ingests a CSV batch of financial records for real-time anomaly detection.
 
-Response (200 OK):
+**Request Body**:
+* `file`: `multipart/form-data` (Standard CSV file)
 
-JSON
+**Response** (`200 OK`):
+```json
 {
   "total_analyzed": 284807,
   "anomalies_found": 24058,
