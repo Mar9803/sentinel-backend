@@ -5,11 +5,14 @@
 ---
 
 ## 📖 Table of Contents
-1. [Project Overview](#-sentinelgraph-ai---fraud-detection-engine)
-2. [Architecture](#️-system-architecture)
-3. [Core Pipeline](#-core-pipeline)
-4. [API Reference](#-api-reference)
+1. [System Architecture](#️-system-architecture)
+2. [Key Components](#-key-components)
+3. [Tech stack](#-tech-stack)
+4. [Core Pipeline](#-core-pipeline)
 5. [Quick Start](#-quick-start)
+6. [API Reference](#-api-reference)
+7. [Data Source](#-data-sourece)
+
 
 ---
 
@@ -30,7 +33,7 @@
 │          │          └──────────┬───────────┘       │        │
 │          │                     │                   │        │
 │          │          ┌──────────▼───────────┐       │        │
-│          └─────────▶│ Graph Analysis Engine│       │        │
+│          └────────▶│ Graph Analysis Engine│       │        │
 │                     │ (PageRank/Clustering)│       │        │
 │                     └──────────┬───────────┘       │        │
 │                                │                   │        │
@@ -41,6 +44,7 @@
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 
+```
 ---
 
 ## ⚙️ Key Components
@@ -49,7 +53,7 @@
 
 **GraphAnalysisEngine** (`graph_analysis.py`):
 - Uses `NetworkX` to construct a similarity network of transactions.
-- Extracts structural features: **PageRank** (node importance) and **Clustering Coefficient** (local density).
+-  Extracts structural features: **PageRank** (node importance) and **Clustering Coefficient** (local density).
 
 **IsolationForestModel** (`model.py`):
 - Uses `Scikit-Learn` implementation of the **Isolation Forest** algorithm.
@@ -59,10 +63,10 @@
 - **Input**: Raw Transaction Data (`CSV`).
 - **Output**: Flagged Anomalies with `anomaly_score`.
 - **Process**:
-  1. Data Cleaning & Feature Scaling.
-  2. Structural Feature Extraction (Graph Metrics).
-  3. ML Inference (Isolation Forest).
-  4. Final Ranking based on Anomaly Probability.
+  1. **Data Cleaning**: `engineer.clean_data(raw_data)` handles missing values.
+  2. **Graph Analysis**: `graph_engine.build_similarity_graph` creates the network.
+  3. **Feature Merge**: Combines original financial features with PageRank/Clustering metrics.
+  4. **ML Prediction**: `detector.predict(X)` identifies outliers (labeled as `-1`).
 
 
 #### 2. **Storage & Data Handling** (`models/`)
@@ -89,49 +93,58 @@
 
 ---
 
+## 🛠️ Tech Stack
 
-
-🛠️ Tech Stack
-Backend: FastAPI (Python 3.11+)
-
-Graph Theory: NetworkX
-
-Machine Learning: Scikit-Learn (Isolation Forest)
-
-Data Handling: Pandas, NumPy
-
-Frontend: Astro (Separate Repository)
-
-📈 Core Pipeline
-Ingest: Accepts CSV files via multipart/form-data endpoints.
-
-Graph Analysis: Constructs a similarity graph between transactions.
-
-PageRank: Measures importance/centrality within the network.
-
-Clustering Coefficient: Identifies local density (fraud rings).
-
-ML Inference: Uses sentinel_v1.pkl to assign an anomaly_score.
-
-🚀 Quick Start
-1. Clone & Navigate
-
-Bash
-git clone [https://github.com/Mar9803/sentinel-backend.git](https://github.com/Mar9803/sentinel-backend.git)
-cd sentinel-backend
-2. Environment Setup
-
-Bash
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-3. Launch API
-
-Bash
-uvicorn main:app --reload
-API live at http://127.0.0.1:8000. Interactive Swagger UI at /docs.
+* **Backend**: `FastAPI` (Python 3.11+)
+* **Graph Theory**: `NetworkX`
+* **Machine Learning**: `Scikit-Learn` (Isolation Forest)
+* **Data Handling**: `Pandas`, `NumPy`
+* **Frontend**: `Astro` (Separate Repository)
 
 ---
+
+## 📈 Core Pipeline
+
+
+1. **Ingest**: Accepts `CSV` files via `multipart/form-data` endpoints.
+2. **Graph Analysis**: Constructs a similarity graph between transactions to detect hidden relationships.
+   - **PageRank**: Measures the relative importance and centrality of a transaction within the payment network.
+   - **Clustering Coefficient**: Identifies local density of nodes, often signaling organized fraud rings.
+3. **ML Inference**: Processes the enriched feature vector (Original data + Graph metrics) using the `sentinel_v1.pkl` model to assign a final `anomaly_score`.
+
+---
+
+## 🚀 Quick Start
+
+#### Clone & Navigate
+```bash
+git clone [https://github.com/Mar9803/sentinel-backend.git](https://github.com/Mar9803/sentinel-backend.git)
+cd sentinel-backend
+```
+#### Environment Setup
+
+```bash
+# Create a virtual environment
+python -m venv venv
+
+# Activate it
+# On Windows:
+source venv/Scripts/activate  
+# On macOS/Linux:
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+#### Launch API
+
+```Bash
+uvicorn main:app --reload
+API live at http://127.0.0.1:8000. Interactive Swagger UI at /docs.
+```
+
+
+
 
 ## 📄 API Reference
 
@@ -156,29 +169,50 @@ API live at http://127.0.0.1:8000. Interactive Swagger UI at /docs.
     }
   ]
 }
-Behavior:
+```
 
-✅ Validates CSV structure and cleans missing data.
+### Behavior
 
-✅ Extracts structural features using PageRank and Clustering.
+* **Model Validation**: Checks if the ML Model is loaded and trained (`detector.is_trained`).
+* **Data Ingestion**: Reads the file stream into a `Pandas` DataFrame.
+* **Graph Extraction**: Computes Graph Centrality metrics (PageRank, Clustering).
+* **Result Filtering**: Returns the top 10 anomalies with their statistical scores to minimize network overhead.
 
-✅ Performs unsupervised inference via Isolation Forest.
+---
 
 📊 System Stats
 GET /api/stats
 
 Response (200 OK):
-
-JSON
+```json
 {
   "total_processed": 500000,
   "flagged_suspicious": 1240,
   "accuracy_estimate": 0.98,
   "system_health": "healthy"
 }
-📝 Design Decisions
-Decoupled Architecture: Backend (Python) and Frontend (Astro) are separated for maximum performance.
+```
+---
 
-In-Memory Loading: The .pkl model is pre-loaded to minimize inference latency.
 
-Security-First: Provides statistical confidence for SOC analyst prioritization.
+## 🛠️ Data Sources
+**Customizing Data Ingestion**
+You can adapt the pipeline to different financial formats by modifying the `engineer` class:
+
+```Python
+# Example of custom data cleaning in src/features.py
+def clean_data(self, raw_data):
+    # Handle specific bank formats (e.g., dropping NaNs)
+    df = raw_data.dropna()
+    return df
+```
+**Extending Graph Features**
+
+If you need to add more network metrics (like Betweenness Centrality) to the analysis:
+
+```Python
+# src/graph_analysis.py
+def extract_new_metrics(self):
+    # Using NetworkX to add advanced centrality metrics
+    return nx.betweenness_centrality(self.G)
+```

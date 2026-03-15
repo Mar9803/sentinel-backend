@@ -3,67 +3,50 @@ import networkx as nx
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 
-class SentinelGraph:
-    """
-    Motore matematico per la trasformazione di log in grafi di simiglianza
-    e l'estrazione di feature topologiche per l'Anomaly Detection.
-    """
+@app.get("/")
+def root():
+    return {"status": "online", "project": "SentinelGraph AI"}
+
+@app.post("/analyze")
+async def analyze_transactions(file: UploadFile = File(...)):
+    # 1. Controllo estensione file prima del try: errore web comunicato nel browser.
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Il file deve essere un CSV")
     
-    def __init__(self, n_neighbors=5, threshold=0.5):
-        self.n_neighbors = n_neighbors
-        self.threshold = threshold
-        self.graph = nx.Graph()
-        self.scaler = StandardScaler() #per scalare le features prima del KNN.
-        self.features_df = None
+    if not detector.is_trained:
+            raise HTTPException(status_code=503, detail="Modello ML non disponibile sul server")
+    try:
+        # 2. Lettura del file inviato tramite fetch
+        contents = await file.read()
+        raw_data = pd.read_csv(io.BytesIO(contents))
+        
+        # 3. PIPELINE, fase dei calcoli ML+NetworkX
+        # Pulizia
+        clean_df = engineer.clean_data(raw_data)
+        # Analisi Grafo
+        graph_engine.build_similarity_graph(clean_df)
+        graph_features = graph_engine.extract_graph_features()
+        # Merge
+        final_df = engineer.merge_graph_features(clean_df, graph_features)
+        # 4. PREDIZIONE (usando il modello caricato)
+        X = final_df.drop(columns=['Class']) if 'Class' in final_df.columns else final_df
+        # Usiamo il modello già pronto
+        predictions = detector.predict(X)
+        scores = detector.get_scores(X) # o uso metodo get_scores(X) nella classe 
+        
+        # 5. PREPARAZIONE RISPOSTA PER ASTRO
+        # Creiamo un risultato leggibile dal frontend
+        final_df['prediction'] = predictions
+        final_df['anomaly_score'] = scores
+        
+        # Filtriamo solo le anomalie per non mandare troppi dati, o mandiamo tutto
+        # Per ora mandiamo i top 10 sospetti come esempio
+        sospetti = final_df[final_df['prediction'] == -1].head(10)
+        return {
+            "total_analyzed": len(final_df),
+            "anomalies_found": int((predictions == -1).sum()),
+            "results": sospetti[['pagerank', 'clustering', 'anomaly_score']].to_dict(orient='records')
+        }
 
-    def build_similarity_graph(self, data: pd.DataFrame):
-        """
-        Trasforma un DataFrame in un Grafo KNN filtrato.
-        Fase 1 della Roadmap: Il Motore Matematico.
-        """
-        # 1. Preprocessing e Scaling
-        # Escludiamo Time e Class se presenti per il calcolo delle distanze
-        cols_to_drop = [c for c in ['Time', 'Class'] if c in data.columns]
-        X = data.drop(columns=cols_to_drop)
-        X_scaled = self.scaler.fit_transform(X)
-        
-        # 2. Calcolo KNN per popolare distances e indices--> construzione grafo
-        knn = NearestNeighbors(n_neighbors=self.n_neighbors + 1)
-        knn.fit(X_scaled)
-        distances, indices = knn.kneighbors(X_scaled)
-        
-        # 3. Costruzione Grafo con Filtraggio
-        self.graph.clear()
-        for i in range(len(indices)): #nodi
-            for j in range(1, self.n_neighbors + 1): #vicini alnodo corrente i
-                neighbor_idx = indices[i][j]
-                distance = distances[i][j]
-                weight = 1 / (1 + distance)
-                
-                # Applicazione del filtraggio discusso nel Notebook
-                if weight >= self.threshold:
-                    self.graph.add_edge(i, neighbor_idx, weight=weight)
-        
-        # Assicuriamoci che tutti i nodi siano presenti (anche se isolati)
-        self.graph.add_nodes_from(range(len(data)))
-        return self.graph
-
-    def extract_graph_features(self):
-        """
-        Calcola PageRank, Clustering e Betweenness.
-        Queste diventeranno le feature per la Isolation Forest.
-        """
-        print("Calcolo metriche del grafo in corso...")
-        
-        pagerank = nx.pagerank(self.graph, weight='weight')
-        clustering = nx.clustering(self.graph, weight='weight')
-        # Betweenness approssimata per efficienza industriale
-        betweenness = nx.betweenness_centrality(self.graph, k=50, weight='weight')
-        
-        self.features_df = pd.DataFrame({
-            'pagerank': pd.Series(pagerank),
-            'clustering': pd.Series(clustering),
-            'betweenness': pd.Series(betweenness)
-        }).fillna(0)
-        
-        return self.features_df
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
