@@ -7,11 +7,11 @@
 ## 📖 Table of Contents
 1. [System Architecture](#️-system-architecture)
 2. [Key Components](#-key-components)
-3. [Tech stack](#-tech-stack)
+3. [Tech Stack](#-tech-stack)
 4. [Core Pipeline](#-core-pipeline)
 5. [Quick Start](#-quick-start)
 6. [API Reference](#-api-reference)
-7. [Data Source](#-data-sourece)
+7. [Data Sources](#-data-soureces)
 
 
 ---
