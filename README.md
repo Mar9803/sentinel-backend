@@ -1,39 +1,70 @@
 # 🛡️ SentinelGraph AI - Fraud Detection Engine
 
-**SentinelGraph** is an advanced analytical engine that merges **Graph Theory** and **Machine Learning** to identify anomalies within massive financial datasets.
-
-It utilizes a hybrid pipeline: extracting structural features via **NetworkX** (PageRank, Clustering) and processing them through an **Isolation Forest** model for robust outlier detection.
+**SentinelGraph** is an advanced analytical engine that merges **Graph Theory** and **Machine Learning** to identify anomalies within massive financial datasets. Now fully containerized, it utilizes a hybrid pipeline: extracting structural features via **NetworkX** (PageRank, Clustering) and processing them through an **Isolation Forest** model.
 
 ---
 
-### 1. Prerequisites
-* Python 3.11+
-* Virtualenv
+### 🚀 Quick Start with Docker
+The entire stack (Backend, Frontend, and Database) is orchestrated via Docker Compose for a consistent environment.
 
-### 2. Installation
-```bash
-git clone [https://github.com/Mar9803/sentinel-backend.git](https://github.com/Mar9803/sentinel-backend.git)
-cd sentinel-backend
-python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+1. **Clone & Enter**
+   ```bash
+   git clone [https://github.com/Mar9803/sentinel-backend.git](https://github.com/Mar9803/sentinel-backend.git)
+   cd sentinel-backend
 ```
+2. **Launch the Stack**
 
-### 3. Execution
-```bash
-uvicorn main:app --reload
+   ```bash
+   docker-compose up --build
 ```
-The API will be available at `http://127.0.0.1:8000`. Access the Swagger UI at `/docs` to test the endpoints interactively.
+3. **Access the Services**
 
+* **Frontend Dashboard: `http://localhost:5000` (Powered by FastHTML)
+* **API Backend:: `http://localhost:8000`
+* **API Documentation: `http://localhost:8000/docs` (Swagger UI)
 ---
 
-## 🏗️ Core Architecture
-The system ingests transactions in CSV format, constructs a similarity graph, and applies centrality algorithms before performing ML inference.
+## 🏗️ System Architecture
 
-```plaintext
-┌─────────────┐       ┌─────────────────┐      ┌──────────────┐
-│  CSV Ingest │ ───▶ │  Graph metrics  │  ───▶│  ML Outlier │ 
-└─────────────┘       └─────────────────┘      └──────────────┘
+The project is divided into three main containers:
+
+* `sentinel_backend`: A FastAPI server that orchestrates the ML pipeline (Cleaning -> Graph Analysis -> Prediction).
+
+* `sentinel_frontend`: A responsive dashboard built with FastHTML for real-time data visualization.
+
+* `sentinel_db`: A PostgreSQL instance for persistent storage of analysis results.
+
+```mermaid
+graph TD
+    subgraph Client ["Client Side (Browser)"]
+        UI[FastHTML Dashboard]
+    end
+
+    subgraph Backend ["sentinel_backend (FastAPI)"]
+        Main[app/main.py]
+        
+        subgraph Logic ["src/ (Core Logic)"]
+            FE[FeatureEngineer]
+            SG[SentinelGraph]
+            FD[FraudDetector]
+        end
+    end
+
+    subgraph Database ["sentinel_db (PostgreSQL)"]
+        DB[(Analysis Results)]
+    end
+
+    %% Flusso Dati
+    UI -- "1. Upload CSV" --> Main
+    Main -- "2. Clean Data" --> FE
+    FE -- "Cleaned DF" --> SG
+    SG -- "3. Build Graph & Extract Features" --> SG
+    SG -- "PageRank/Clustering" --> FE
+    FE -- "4. Merge Features" --> Main
+    Main -- "5. Prediction" --> FD
+    FD -- "Anomaly Scores" --> Main
+    Main -- "6. Return JSON Results" --> UI
+    Main -.-> DB
 ```
 
 ---
