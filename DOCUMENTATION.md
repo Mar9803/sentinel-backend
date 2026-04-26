@@ -1,218 +1,112 @@
 # 🛡️ SentinelGraph AI - Fraud Detection Engine
 
-**SentinelGraph** is an analytical engine that combines **Graph Theory** and **Machine Learning** to identify anomalies in massive financial datasets. It utilizes a hybrid pipeline: extracting structural features via NetworkX (PageRank, Clustering) and processing them through an Isolation Forest model for robust outlier detection.
+**SentinelGraph** is a personal porject inspired by real-time fraud detection ecosystem engineered for scalability, modularity, and high-precision anomaly detection. The system integrates **Graph Theory**, **Unsupervised Machine Learning**, and a **Docker-orchestrated microservices architecture** to identify complex fraudulent patterns in financial transaction streams.
 
----
 
 ## 📖 Table of Contents
-1. [System Architecture](#-system-architecture)
+1. [System Design & Architecture](#-system-Design-&-architecture)
 2. [Key Components](#-key-components)
-3. [Tech Stack](#-tech-stack)
-4. [Core Pipeline](#-core-pipeline)
-5. [Quick Start](#-quick-start)
-6. [API Reference](#-api-reference)
-7. [Data Sources](#-data-sources)
+3. [Orchestration Deployment](#-Orchestration-Deployment)
+4. [Detection Pipeline: The Hybrid Approach](#-Detection-Pipeline:-The-Hybrid-Approach)
+5. [Tech Stack](#-Tech-stack)
+6. [Performance & Metric Strategy](#-Performance-&-Metric-Strategy)
+7. [Roadmap & Future Developments](#-Roadmap-&-Future-Developments)
 
 
----
+## 🏗️ System Design & Architecture
 
-## 🏗️ System Architecture
+Designed following **MLOps** best practice, SentinelGraph ensures a strict decoupling between computational logic, model inference, and user interface.
 
-```text
-┌─────────────────────────────────────────────────────────────┐
-│                   SentinelGraph API (FastAPI)               │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   ┌──────────────┐      ┌─────────────┐      ┌──────────┐   │
-│   │ POST /analyze│ ────▶│ CSV Ingest  │ ────▶│ Response │   │
-│   └──────────────┘      └─────────────┘      └──────────┘   │
-│          │                     │                   ▲        │
-│          │          ┌──────────▼───────────┐       │        │
-│          │          │   Feature Engineer   │       │        │
-│          │          │ (Cleaning & Scaling) │       │        │
-│          │          └──────────┬───────────┘       │        │
-│          │                     │                   │        │
-│          │          ┌──────────▼───────────┐       │        │
-│          └────────▶│ Graph Analysis Engine│       │        │
-│                     │ (PageRank/Clustering)│       │        │
-│                     └──────────┬───────────┘       │        │
-│                                │                   │        │
-│                     ┌──────────▼───────────┐       │        │
-│                     │  Isolation Forest ML │ ──────┘        │
-│                     │  (Anomaly Scoring)   │                │
-│                     └──────────────────────┘                │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    User((User)) --> Dashboard[FastHTML Dashboard]
+    Dashboard --> API[FastAPI Backend]
+    
+    subgraph "Core Engine"
+    API --> Rules[Static Rules Engine]
+    API --> Graph[Graph Intelligence - NetworkX]
+    API --> DB[(PostgreSQL)]
+    end
 
+    Rules --> Orchestrator{Champion-Challenger}
+    Graph --> Orchestrator
+
+    subgraph "ML Ensemble"
+    Orchestrator --> IF[Isolation Forest]
+    Orchestrator --> XGB[XGBoost]
+    Orchestrator --> AE[Autoencoders]
+    end
+
+    IF --> Result[Final Fraud Score]
+    XGB --> Result
+    AE --> Result
+    Result --> Dashboard
 ```
----
 
 ## ⚙️ Key Components
+**1. Backend (FastAPI):** A high-performance inference engine managing the data lifecycle, from strict schema validation (Pydantic) to real-time scoring.
 
-#### 1. **Detection Pipeline** (`src/`)
+**2. ML Wrapper Layer:** An abstraction layer that coordinates multiple models (Isolation Forest, XGBoost) and integrates graph-derived features into the inference pipeline.
 
-**GraphAnalysisEngine** (`graph_analysis.py`):
-- Uses `NetworkX` to construct a similarity network of transactions.
--  Extracts structural features: **PageRank** (node importance) and **Clustering Coefficient** (local density).
+**3. Graph Engine (NetworkX):** A topological analysis layer that injects structural features (PageRank, Clustering Coefficient) into the model's input vector.
 
-**IsolationForestModel** (`model.py`):
-- Uses `Scikit-Learn` implementation of the **Isolation Forest** algorithm.
-- Performs unsupervised anomaly detection by isolating outliers in the high-dimensional feature space.
+**4. Persistence Layer (PostgreSQL):** A relational database for persistent storage of transactions, audit logs, and model performance monitoring.
 
-**TransactionRanker** (Core Logic):
-- **Input**: Raw Transaction Data (`CSV`).
-- **Output**: Flagged Anomalies with `anomaly_score`.
-- **Process**:
-  1. **Data Cleaning**: `engineer.clean_data(raw_data)` handles missing values.
-  2. **Graph Analysis**: `graph_engine.build_similarity_graph` creates the network.
-  3. **Feature Merge**: Combines original financial features with PageRank/Clustering metrics.
-  4. **ML Prediction**: `detector.predict(X)` identifies outliers (labeled as `-1`).
+**5. Dashboard (FastHTML):** A high-performance "Hyperpage" frontend powered by HTMX, providing real-time anomaly visualization without the overhead of heavy client-side frameworks.
+
+## 🚀 Orchestration & Deployment 
+The entire ecosystem is containerized to ensure full reproducibility across development and production environments.
+####  Docker Specifications:
+- `backend`: Python 3.11-slim optimized with C-extensions for ML workloads.
+- `frontend`: Lightweight FastHTML/Uvicorn environment.
+- `.db`: : PostgreSQL 16 instance with persistent volume mapping for data durability.
 
 
-#### 2. **Storage & Data Handling** (`models/`)
+## 📈 Detection Pipeline: The Hybrid Approach
+SentinelGraph does not rely on a single point of failure. It employs a layered defense strategy that combines deterministic logic with probabilistic machine learning.
 
-**In-Memory Model Store**:
-- Loads the pre-trained `.pkl` model at startup for near-zero latency inference.
-- Handles massive dataframes using `Pandas` and `NumPy` for efficient vectorized operations.
+* **Layer 1: Deterministic Heuristics (The "Coarse" Filter)**
 
-#### 3. **API Layer** (`main.py`)
+Transactions first hit the **Static Rule Engine**. This layer acts as a high-speed firewall, neutralizing obvious threats—such as high-velocity attacks, blacklisted IDs, or impossible travel scenarios—with zero latency and 100% interpretability.
 
-**POST `/analyze`**:
-- Accepts `multipart/form-data` (CSV).
-- Orchestrates the full pipeline (Graph + ML).
-- Returns detailed results including graph metrics and anomaly scores.
+* **Layer 2: Topological Enrichment (Graph Intelligence)**
 
-**GET `/api/stats`**:
-- Returns cumulative metrics: `total_processed`, `flagged_suspicious`, and `system_health`.
+For transactions clearing Layer 1, the system reconstructs a Similarity Graph to uncover structural anomalies:
 
-#### 4. **Frontend Dashboard** (`astro-frontend/`)
+**PageRank Centrality:**  Identifies "hubs" of suspicious activity and influence within the network.
 
-- Built with **Astro** for extreme performance.
-- Decoupled architecture communicating via REST API.
-- Real-time visualization of transaction clusters and flagged outliers.
+**Clustering Coefficient:** Detects local densities, signaling organized fraud rings or coordinated botnet attacks.
+
+* **Layer 3: The Champion-Challenger Orchestration**
+
+Enriched data is fed into a Champion-Challenger framework. This is not just a comparison, but a real-time race between different mathematical approaches:
+
+* **Supervised (XGBoost):**: The "Pattern Specialist." It learns from labeled historical data to recognize known attack signatures.
+* **Unsupervised (Isolation Forest):**: The "Zero-Day Detector." It isolates statistical outliers, catching novel fraud schemes that have no historical precedent.
+* **Deep Learning (Autoencoders):**: The "Complexity Expert." It flags transactions with high reconstruction errors, identifying non-linear anomalies in high-dimensional space.
 
 ---
-
 ## 🛠️ Tech Stack
-
-* **Backend**: `FastAPI` (Python 3.11+)
-* **Graph Theory**: `NetworkX`
-* **Machine Learning**: `Scikit-Learn` (Isolation Forest)
-* **Data Handling**: `Pandas`, `NumPy`
+* **Language**: Python 3.11+
+* **API Framework**: `FastAPI` (Asynchronous I/O for low-latency inference)
+* **ML & Analytics:**: `Scikit-Learn`, `NumPy`, `Pandas`
+* **Network Science**: `NetworkX`
+* **UI/UX:**: `FastHTML`, `ailwind CSS`
+* **Infrastructure**: `Docker`, `Docker Compose`
 * **Frontend**: `Astro` (Separate Repository)
 
 ---
+## 📊 Performance & Metric Strategy
 
-## 📈 Core Pipeline
+In fraud detection, **Accuracy is a vanity metric** due to severe class imbalance. SentinelGraph evaluates models based on their ability to handle rare events:
 
-
-1. **Ingest**: Accepts `CSV` files via `multipart/form-data` endpoints.
-2. **Graph Analysis**: Constructs a similarity graph between transactions to detect hidden relationships.
-   - **PageRank**: Measures the relative importance and centrality of a transaction within the payment network.
-   - **Clustering Coefficient**: Identifies local density of nodes, often signaling organized fraud rings.
-3. **ML Inference**: Processes the enriched feature vector (Original data + Graph metrics) using the `sentinel_v1.pkl` model to assign a final `anomaly_score`.
-
+* **Precision-Recall & F1-Score:**: To balance the cost of false positives (bad customer experience) vs. false negatives (financial loss).
+* **AUC-ROC & PR-AUC**: To measure the model's discriminative power across all classification thresholds.
+* **Cost-Sensitive Learning:**: Optimizing the system to minimize the total financial impact, acknowledging that missing a large transaction is more critical than missing a small one.
 ---
+## 🗺️ Roadmap & Future Developments
 
-## 🚀 Quick Start
+* **Real-time Streaming**: Integration with Apache Kafka for live data ingestion.
+* **Explainable AI (XAI)**: Integration of SHAP/LIME to provide transparency on why a transaction was flagged.
+* **Astro Integration**: Seamlessly embedding FastHTML dashboards into Astro-based corporate portals.
 
-#### Clone & Navigate
-```bash
-git clone [https://github.com/Mar9803/sentinel-backend.git](https://github.com/Mar9803/sentinel-backend.git)
-cd sentinel-backend
-```
-#### Environment Setup
-
-```bash
-# Create a virtual environment
-python -m venv venv
-
-# Activate it
-# On Windows:
-source venv/Scripts/activate  
-# On macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-#### Launch API
-
-```Bash
-uvicorn main:app --reload
-API live at http://127.0.0.1:8000. Interactive Swagger UI at /docs.
-```
-
-
-
-
-## 📄 API Reference
-
-### Analyze Transactions
-`POST` `/analyze`
-
-> **Purpose**: Ingests a CSV batch of financial records for real-time anomaly detection.
-
-**Request Body**:
-* `file`: `multipart/form-data` (Standard CSV file)
-
-**Response** (`200 OK`):
-```json
-{
-  "total_analyzed": 284807,
-  "anomalies_found": 24058,
-  "results": [
-    {
-      "pagerank": 0.000005,
-      "clustering": 0.9942,
-      "anomaly_score": -0.01
-    }
-  ]
-}
-```
-
-### Behavior
-
-* **Model Validation**: Checks if the ML Model is loaded and trained (`detector.is_trained`).
-* **Data Ingestion**: Reads the file stream into a `Pandas` DataFrame.
-* **Graph Extraction**: Computes Graph Centrality metrics (PageRank, Clustering).
-* **Result Filtering**: Returns the top 10 anomalies with their statistical scores to minimize network overhead.
-
----
-
-📊 System Stats
-GET /api/stats
-
-Response (200 OK):
-```json
-{
-  "total_processed": 500000,
-  "flagged_suspicious": 1240,
-  "accuracy_estimate": 0.98,
-  "system_health": "healthy"
-}
-```
----
-
-
-## 🛠️ Data Sources
-**Customizing Data Ingestion**
-You can adapt the pipeline to different financial formats by modifying the `engineer` class:
-
-```Python
-# Example of custom data cleaning in src/features.py
-def clean_data(self, raw_data):
-    # Handle specific bank formats (e.g., dropping NaNs)
-    df = raw_data.dropna()
-    return df
-```
-**Extending Graph Features**
-
-If you need to add more network metrics (like Betweenness Centrality) to the analysis:
-
-```Python
-# src/graph_analysis.py
-def extract_new_metrics(self):
-    # Using NetworkX to add advanced centrality metrics
-    return nx.betweenness_centrality(self.G)
-```

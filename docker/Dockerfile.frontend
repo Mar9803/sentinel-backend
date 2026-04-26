@@ -1,0 +1,13 @@
+# Configurazione di Docker NON multi-stage. 
+FROM python:3.11-slim 
+
+# Create a directory /code in the container. All the following actions will be executed inthere (is like cd /code).
+WORKDIR /code
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Comando per avviare FastHTML
+CMD ["uvicorn", "dashboard.main:app", "--host", "0.0.0.0", "--port", "5000", "--reload"]

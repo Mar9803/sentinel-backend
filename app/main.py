@@ -26,7 +26,7 @@ engineer = FeatureEngineer()
 
 @app.get("/")
 def root():
-    return {"status": "online", "project": "SentinelGraph AI"}
+    return {"status": "Il Beckend è vivo", "project": "SentinelGraph AI"}
 
 @app.post("/analyze")
 async def analyze_transactions(file: UploadFile = File(...)):

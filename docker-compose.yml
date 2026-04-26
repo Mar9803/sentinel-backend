@@ -1,0 +1,53 @@
+# comunicazione tra DB, BE, FE.
+
+version: '3.8'
+
+services:
+  # 1. Il Database
+  db:
+    image: postgres:16
+    container_name: sentinel_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: sentinel_vault
+    ports:
+      - "5432:5432"
+    # salva i dati in un file presistente nel pc
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Il Backend (FastAPI)
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: sentinel_backend
+    volumes:
+      - .:/code
+    ports:
+      - "8000:8000"
+    # Aspettare che il db sia acceso prima di avviarsi.
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://admin:password123@db:5432/sentinel_vault
+
+  # 3. Il Frontend (FastHTML)
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: sentinel_frontend
+    volumes:
+      - .:/code
+    ports:
+      - "5000:5000"
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000
+
+volumes:
+  postgres_data:

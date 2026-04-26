@@ -1,0 +1,19 @@
+FROM python:3.11-slim 
+
+WORKDIR /code
+
+# NECESSARIO per PostgreSQL e librerie ML:
+# Senza queste, l'installazione di psycopg2 o xgboost nel backend potrebbe fallire
+RUN apt-get update && apt-get install -y \
+    libpq-dev \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# Avvia FastAPI
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
