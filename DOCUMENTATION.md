@@ -4,10 +4,10 @@
 
 
 ## 📖 Table of Contents
-1. [System Design & Architecture](#-system-Design-&-architecture)
-2. [Key Components](#-key-components)
-3. [Orchestration Deployment](#-Orchestration-Deployment)
-4. [Detection Pipeline: The Hybrid Approach](#-Detection-Pipeline:-The-Hybrid-Approach)
+1. [System Design & Architecture](#-system-design--architecture)
+2. [Key Components](#key-components)
+3. [Orchestration Deployment](#Orchestration-Deployment)
+4. [Detection Pipeline: The Hybrid Approach](#-Detection-Pipeline-the-Hybrid-Approach)
 5. [Tech Stack](#-Tech-stack)
 6. [Performance & Metric Strategy](#-Performance-&-Metric-Strategy)
 7. [Roadmap & Future Developments](#-Roadmap-&-Future-Developments)
