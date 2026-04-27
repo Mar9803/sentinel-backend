@@ -1,6 +1,13 @@
 # 🛡️ SentinelGraph AI - Fraud Detection Engine
 
-**SentinelGraph** is an advanced analytical engine that merges **Graph Theory** and **Machine Learning** to identify anomalies within massive financial datasets. Now fully containerized, it utilizes a hybrid pipeline: extracting structural features via **NetworkX** (PageRank, Clustering) and processing them through an **Isolation Forest** model.
+![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.109%2B-009688?style=flat&logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat&logo=docker&logoColor=white)
+![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-F7931E?style=flat&logo=scikit-learn&logoColor=white)
+![NetworkX](https://img.shields.io/badge/NetworkX-Graph--Enriched-blueviolet)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+**SentinelGraph** is an advanced analytical engine that merges **Static rules**, **Network analysis** and **Machine Learning** to identify anomalies within massive financial datasets. 
 
 ---
 
@@ -8,20 +15,21 @@
 The entire stack (Backend, Frontend, and Database) is orchestrated via Docker Compose for a consistent environment.
 
 1. **Clone & Enter**
-   ```bash
+```bash
    git clone [https://github.com/Mar9803/sentinel-backend.git](https://github.com/Mar9803/sentinel-backend.git)
    cd sentinel-backend
 ```
+
 2. **Launch the Stack**
 
-   ```bash
+```bash
    docker-compose up --build
 ```
 3. **Access the Services**
 
-* **Frontend Dashboard: `http://localhost:5000` (Powered by FastHTML)
-* **API Backend:: `http://localhost:8000`
-* **API Documentation: `http://localhost:8000/docs` (Swagger UI)
+* **Frontend Dashboard**: `http://localhost:5000` (Powered by FastHTML)
+* **API Backend**: `http://localhost:8000`
+* **API Documentation**: `http://localhost:8000/docs` (Swagger UI)
 ---
 
 ## 🏗️ System Architecture
