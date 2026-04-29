@@ -1,5 +1,7 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
+import numpy as np
 import io
 import joblib
 
@@ -9,6 +11,17 @@ from src.features import FeatureEngineer
 from src.model import FraudDetector
 
 app = FastAPI(title="SentinelGraph API")
+
+# --- CONFIGURAZIONE CORS ---
+# Permette ad Astro (solitamente su porta 4321 o 3000) di comunicare col Backend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In produzione metti l'URL del tuo blog Astro
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Inizializzazione detector, graph_engine, engineer
 detector= FraudDetector()
 
 # --- INIZIALIZZAZIONE COMPONENTI ---
@@ -27,6 +40,18 @@ engineer = FeatureEngineer()
 @app.get("/")
 def root():
     return {"status": "Il Beckend è vivo", "project": "SentinelGraph AI"}
+
+# ESEMPIO ENDPOINT PER I GRAFICI
+@app.get("/api/stats")
+async def get_stats():
+    """Endpoint veloce per il blog Astro"""
+    return {
+        "status": "online",
+        "engine": "Isolation Forest + NetworkX",
+        "alerts_today": 12, # Esempio di dato statico o recuperato da DB
+        "risk_levels": {"Safe": 85, "Warning": 10, "Fraud": 5}
+    }
+
 
 @app.post("/analyze")
 async def analyze_transactions(file: UploadFile = File(...)):
@@ -49,27 +74,59 @@ async def analyze_transactions(file: UploadFile = File(...)):
         graph_features = graph_engine.extract_graph_features()
         # Merge
         final_df = engineer.merge_graph_features(clean_df, graph_features)
-        # 4. PREDIZIONE (usando il modello caricato)
-        X = final_df.drop(columns=['Class']) if 'Class' in final_df.columns else final_df
-        # Usiamo il modello già pronto
-        predictions = detector.predict(X)
-        scores = detector.get_scores(X) # o uso metodo get_scores(X) nella classe 
+        # --- 4. PREDIZIONE (VERSIONE FINALE CORAZZATA) ---
+        # 1. Definiamo i gruppi di colonne
+        v_cols = [f'V{i}' for i in range(1, 29)] # V1...V28
+        graph_cols = ['pagerank', 'clustering', 'betweenness']
         
-        # 5. PREPARAZIONE RISPOSTA PER ASTRO
-        # Creiamo un risultato leggibile dal frontend
+        # 2. Questo è l'ordine esatto che il modello si aspetta (V1-V28, poi Amount, poi Grafo)
+        expected_order = v_cols + ['Amount'] + graph_cols
+        
+        # 3. Prepariamo il DataFrame X partendo da final_df
+        X = final_df.copy()
+        
+        # 4. Tappiamo i buchi (se mancano colonne nel CSV o nel Grafo)
+        for col in expected_order:
+            if col not in X.columns:
+                X[col] = 0.0
+        
+        # 5. FORZIAMO L'ORDINE (Questa è la riga che risolve l'errore del terminale)
+        X = X[expected_order]
+        
+        # 6. Predizione
+        predictions = detector.predict(X)
+        scores = detector.get_scores(X) 
+        
+        # Riattacchiamo i risultati a final_df per la visualizzazione
         final_df['prediction'] = predictions
         final_df['anomaly_score'] = scores
         
-        # Filtriamo solo le anomalie per non mandare troppi dati, o mandiamo tutto
-        # Per ora mandiamo i top 10 sospetti come esempio
+        # --- STATISTICHE ---
+        counts, bins = np.histogram(scores, bins=10)
+        risk_counts = {
+            "Safe": int((scores > 0.05).sum()),
+            "Warning": int(((scores <= 0.05) & (scores > -0.05)).sum()),
+            "Fraud": int((scores <= -0.05).sum())
+        }
+    
         sospetti = final_df[final_df['prediction'] == -1].head(10)
+     
         return {
             "total_analyzed": len(final_df),
             "anomalies_found": int((predictions == -1).sum()),
+            "stats": {
+                "risk_distribution": risk_counts,
+                "histogram": {
+                    "labels": [f"{round(b, 2)}" for b in bins[:-1]],
+                    "values": counts.tolist()
+                }
+            },
             "results": sospetti[['pagerank', 'clustering', 'anomaly_score']].to_dict(orient='records')
         }
 
     except Exception as e:
+        # Stampiamo l'errore nel terminale per debuggare meglio
+        print(f"ERRORE DURANTE ANALISI: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
