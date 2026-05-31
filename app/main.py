@@ -5,7 +5,8 @@ import numpy as np
 import io
 import joblib
 
-# Importiamo i tuoi componenti dalla cartella src
+from app.schemas import PredictionResponse, TransactionInput
+from src.engine.wrapper import FraudWrapper
 from src.graph_analysis import SentinelGraph
 from src.features import FeatureEngineer
 from src.model import FraudDetector
@@ -36,6 +37,7 @@ except Exception as e:
 # Inizializziamo gli altri motori
 graph_engine = SentinelGraph(n_neighbors=5, threshold=0.5)
 engineer = FeatureEngineer()
+fraud_wrapper = FraudWrapper()
 
 @app.get("/")
 def root():
@@ -51,6 +53,19 @@ async def get_stats():
         "alerts_today": 12, # Esempio di dato statico o recuperato da DB
         "risk_levels": {"Safe": 85, "Warning": 10, "Fraud": 5}
     }
+
+
+@app.post("/api/v1/predict", response_model=PredictionResponse)
+async def predict_transaction(transaction: TransactionInput) -> PredictionResponse:
+    """
+    Inferenza transazionale in tempo reale tramite FraudWrapper (Primo Muro: regole statiche).
+    """
+    try:
+        result = fraud_wrapper.predict_all(transaction.to_wrapper_dict())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return PredictionResponse.model_validate(result)
 
 
 @app.post("/analyze")
