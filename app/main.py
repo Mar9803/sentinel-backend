@@ -7,6 +7,7 @@ import joblib
 
 from app.schemas import PredictionResponse, TransactionInput
 from src.engine.wrapper import FraudWrapper
+from src.web.dashboard import dashboard_app
 from src.graph_analysis import SentinelGraph
 from src.features import FeatureEngineer
 from src.model import FraudDetector
@@ -14,10 +15,19 @@ from src.model import FraudDetector
 app = FastAPI(title="SentinelGraph API")
 
 # --- CONFIGURAZIONE CORS ---
-# Permette ad Astro (solitamente su porta 4321 o 3000) di comunicare col Backend
+# Origini esplicite per sviluppo locale (Astro + dashboard FastHTML + API diretta)
+CORS_ORIGINS = [
+    "http://localhost:4321",
+    "http://127.0.0.1:4321",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:5000",
+    "http://127.0.0.1:5000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In produzione metti l'URL del tuo blog Astro
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -38,6 +48,8 @@ except Exception as e:
 graph_engine = SentinelGraph(n_neighbors=5, threshold=0.5)
 engineer = FeatureEngineer()
 fraud_wrapper = FraudWrapper()
+
+app.mount("/dashboard", dashboard_app)
 
 @app.get("/")
 def root():
