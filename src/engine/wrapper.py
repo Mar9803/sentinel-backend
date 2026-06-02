@@ -23,6 +23,9 @@ VELOCITY_MAX_TRANSACTIONS = 3  # trigger se > 3 (i.e. la 4ª transazione)
 AMOUNT_STD_THRESHOLD = 3.0
 COMMERCIAL_JET_SPEED_KMH = 850.0
 MIN_FLIGHT_BUFFER_MINUTES = 30.0
+XGB_RISK_THRESHOLD = 0.7
+DEFAULT_XGB_MODEL_PATH = "models/xgb_sentinel_v1.pkl"
+DEFAULT_IF_MODEL_PATH = "models/sentinel_v1.pkl"
 
 # Coordinate approssimative (capitale/centroide) per Impossible Travel
 COUNTRY_COORDS: dict[str, tuple[float, float]] = {
@@ -267,48 +270,114 @@ class FraudWrapper:
     """
     Orchestratore unificato per inferenza transazionale singola.
 
-    Flusso attuale (fase 1):
-      1. Normalizza il JSON in ingresso
-      2. Valuta le Regole Statiche (Primo Muro)
-      3. Short-circuit su regola critica → BLOCK, ML bypassato
-      4. (fase 2+) XGBoost, Isolation Forest, Autoencoder in parallelo
+    Flusso:
+      1. Primo Muro  — Regole statiche (short-circuit → BLOCK)
+      2. Secondo Muro — XGBoost supervisionato (short-circuit se score >= 0.7)
+      3. Terzo Muro  — Isolation Forest + Autoencoder (anomaly detection)
     """
 
-    def __init__(self, store: InMemoryTransactionStore | None = None) -> None:
+    def __init__(
+        self,
+        store: InMemoryTransactionStore | None = None,
+        xgb_model_path: str = DEFAULT_XGB_MODEL_PATH,
+        if_model_path: str = DEFAULT_IF_MODEL_PATH,
+    ) -> None:
         self._store = store or InMemoryTransactionStore.with_seed_data()
         self._rules = StaticRulesEngine(self._store)
+        self._xgb = self._init_xgb_scorer(xgb_model_path)
+        self._anomaly = self._init_anomaly_scorer(if_model_path)
+
+    def _init_xgb_scorer(self, model_path: str):
+        from src.engine.xgb_scorer import XGBoostScorer
+
+        return XGBoostScorer(model_path=model_path)
+
+    def _init_anomaly_scorer(self, model_path: str):
+        from src.engine.anomaly_scorer import AnomalyScorer
+
+        return AnomalyScorer(if_model_path=model_path)
 
     def predict_all(self, transaction: dict) -> dict:
         tx = _parse_transaction(transaction)
         rule_results = self._rules.evaluate(tx)
-        triggered_rules = [r for r in rule_results if r.triggered]
-        critical_triggered = any(r.triggered and r.critical for r in rule_results)
 
-        if critical_triggered:
+        if _rules_short_circuit(rule_results):
             response = _build_response(
                 tx=tx,
                 decision=Decision.BLOCK,
                 rule_results=rule_results,
                 ml_bypassed=True,
                 models=None,
+                final_score=1.0,
             )
             self._store.append(tx)
             return response
 
-        # Fase 2: qui verranno invocati XGBoost, IF e Autoencoder in parallelo
+        models: dict[str, float | None] = {
+            "xgb": None,
+            "isolation_forest": None,
+            "autoencoder": None,
+        }
+        final_score = 0.0
+
+        xgb_score, xgb_blocks = self._run_xgb_wall(transaction)
+        if xgb_score is not None:
+            models["xgb"] = xgb_score
+            final_score = xgb_score
+
+        if xgb_blocks:
+            response = _build_response(
+                tx=tx,
+                decision=Decision.BLOCK,
+                rule_results=rule_results,
+                ml_bypassed=False,
+                models=models,
+                final_score=final_score,
+            )
+            self._store.append(tx)
+            return response
+
+        anomaly = self._run_anomaly_wall(transaction)
+        if anomaly is not None:
+            models["isolation_forest"] = anomaly["isolation_forest"]
+            models["autoencoder"] = anomaly["autoencoder"]
+            final_score = max(final_score, anomaly["max_score"])
+
+        decision = Decision.BLOCK if anomaly and anomaly["should_block"] else Decision.PASS
+
         response = _build_response(
             tx=tx,
-            decision=Decision.PASS,
+            decision=decision,
             rule_results=rule_results,
             ml_bypassed=False,
-            models={
-                "xgb": None,
-                "isolation_forest": None,
-                "autoencoder": None,
-            },
+            models=models,
+            final_score=final_score,
         )
         self._store.append(tx)
         return response
+
+    def _run_xgb_wall(self, transaction: dict) -> tuple[float | None, bool]:
+        if not self._xgb.is_loaded:
+            return None, False
+        score = round(self._xgb.score(transaction), 4)
+        return score, score >= XGB_RISK_THRESHOLD
+
+    def _run_anomaly_wall(self, transaction: dict) -> dict[str, float | bool] | None:
+        if not self._anomaly.is_loaded:
+            return None
+        scores = self._anomaly.score(transaction)
+        if_score = round(scores.isolation_forest, 4)
+        ae_score = round(scores.autoencoder, 4)
+        return {
+            "isolation_forest": if_score,
+            "autoencoder": ae_score,
+            "max_score": max(if_score, ae_score),
+            "should_block": scores.should_block,
+        }
+
+
+def _rules_short_circuit(rule_results: list[RuleResult]) -> bool:
+    return any(r.triggered and r.critical for r in rule_results)
 
 
 # --- Helpers ---
@@ -374,6 +443,7 @@ def _build_response(
     rule_results: list[RuleResult],
     ml_bypassed: bool,
     models: dict[str, Any] | None,
+    final_score: float,
 ) -> dict:
     triggered = [r.rule_name for r in rule_results if r.triggered]
     rules_score = 1.0 if triggered else 0.0
@@ -382,7 +452,7 @@ def _build_response(
         "transaction_id": tx.transaction_id,
         "user_id": tx.user_id,
         "decision": decision.value,
-        "final_score": rules_score if ml_bypassed else 0.0,
+        "final_score": round(final_score, 4),
         "rules": {
             "score": rules_score,
             "triggered": triggered,

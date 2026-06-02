@@ -39,13 +39,18 @@ class TransactionInput(BaseModel):
 
     def to_wrapper_dict(self) -> dict:
         """Converte lo schema nel dizionario atteso da FraudWrapper.predict_all()."""
-        return {
+        payload = {
             "transaction_id": self.transaction_id,
             "user_id": self.user_id,
             "amount": self.amount,
             "country": self.country,
             "timestamp": self.timestamp,
         }
+        if self.merchant_type is not None:
+            payload["merchant_type"] = self.merchant_type
+        if self.card_type is not None:
+            payload["card_type"] = self.card_type
+        return payload
 
 
 class RuleEvaluation(BaseModel):
