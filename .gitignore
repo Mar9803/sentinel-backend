@@ -1,4 +1,5 @@
 venv/
+.env
 # i dati pesanti
 creditcard.csv
 data/*.csv
