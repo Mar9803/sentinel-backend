@@ -33,13 +33,7 @@ app.add_middleware(
     # Permettiamo solo i metodi necessari alle tue dashboard
     allow_methods=["GET", "POST"],
     # Principio del privilegio minimo: accettiamo solo gli header standard + HTMX
-    allow_headers=[
-        "Content-Type",
-        "HX-Request",
-        "HX-Trigger",
-        "HX-Target",
-        "HX-Current-URL"
-    ],
+    allow_headers=["*"],
 )
 
 # Inizializzazione detector, graph_engine, engineer
