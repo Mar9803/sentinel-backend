@@ -34,8 +34,49 @@ HTMX_INDICATOR_CSS = Style(
     .htmx-indicator { opacity: 0; transition: opacity 300ms ease-in; }
     .htmx-request .htmx-indicator,
     .htmx-request.htmx-indicator { opacity: 1; }
+
+    /* Card KPI: sfondo opaco slate-600 se Tailwind embed non applica le classi */
+    #sentinel-simulation-widget [id^="kpi-"] {
+      background-color: #475569;
+      border-color: #64748b;
+    }
+
+    #sentinel-simulation-widget .sentinel-panel-opaque {
+      background-color: #334155;
+      border-color: #64748b;
+    }
+
+    #sentinel-simulation-widget .sentinel-kpi-label {
+      color: #94a3b8;
+    }
+    html[data-theme="light"] #sentinel-simulation-widget .sentinel-kpi-label {
+      color: #0f172a;
+    }
+
+    #sentinel-simulation-widget .sentinel-kpi-gains {
+      color: #d4e8c4;
+    }
+
+    /* Pulsanti opachi slate-600 (Start / Reset) */
+    #sentinel-simulation-widget .sentinel-btn-outline {
+      border-radius: 0.75rem;
+      border: 1px solid #64748b;
+      padding: 0.625rem 1.25rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      background-color: #475569;
+      color: #f1f5f9;
+      transition: background-color 0.15s ease;
+    }
+    #sentinel-simulation-widget .sentinel-btn-outline:hover {
+      background-color: #64748b;
+    }
     """
 )
+
+BTN_OUTLINE_CLS = "sentinel-btn-outline bg-slate-600 hover:bg-slate-500"
+KPI_LABEL_CLS = "sentinel-kpi-label text-xs font-bold uppercase tracking-wider text-slate-400"
+KPI_GAINS_CLS = "sentinel-kpi-gains"
 
 dashboard_app, rt = fast_app(
     hdrs=(TAILWIND_CDN, HTMX_INDICATOR_CSS),
@@ -74,9 +115,9 @@ def run_inference(payload: dict[str, Any]) -> dict[str, Any]:
 def _kpi_card(kpi_id: str, label: str, value: str, accent: str) -> Any:
     return Div(
         id=kpi_id,
-        cls="rounded-xl border border-slate-600/60 bg-slate-800/90 p-4 text-center",
+        cls="rounded-xl border border-slate-500 bg-slate-600 p-4 text-center",
     )(
-        P(label, cls="text-xs font-bold uppercase tracking-wider text-slate-400"),
+        P(label, cls=KPI_LABEL_CLS),
         P(value, cls=f"mt-2 text-2xl font-black {accent}"),
     )
 
@@ -88,12 +129,12 @@ def _kpi_panel() -> Any:
         cls="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4",
         hx_swap_oob="true",
     )(
-        _kpi_card("kpi-analyzed", "Transactions analyzed", str(m.transactions_analyzed), "text-white"),
+        _kpi_card("kpi-analyzed", "Transactions analyzed", str(m.transactions_analyzed), "text-slate-100"),
         _kpi_card(
             "kpi-losses-avoided",
             "Losses avoided",
             f"€ {m.losses_avoided_eur:,.2f}",
-            "text-emerald-400",
+            KPI_GAINS_CLS,
         ),
         _kpi_card("kpi-damages", "Losses incurred", f"€ {m.damages_eur:,.2f}", "text-red-400"),
         _kpi_card(
@@ -127,10 +168,7 @@ def _stream_controls(running: bool) -> Any:
         buttons = Div(cls="mt-4 flex flex-wrap gap-3")(
             Button(
                 "▶ Start stream",
-                cls=(
-                    "rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white "
-                    "shadow-md hover:bg-emerald-700 transition"
-                ),
+                cls=BTN_OUTLINE_CLS,
                 hx_post=_p("/stream/start"),
                 hx_target="#stream-controls-slot",
                 hx_swap="innerHTML",
@@ -138,10 +176,7 @@ def _stream_controls(running: bool) -> Any:
             ),
             Button(
                 "↻ Reset metrics",
-                cls=(
-                    "rounded-xl border border-slate-500 px-5 py-2.5 text-sm "
-                    "font-semibold text-slate-300 hover:bg-slate-700 transition"
-                ),
+                cls=BTN_OUTLINE_CLS,
                 hx_post=_p("/stream/stop"),
                 hx_target="#stream-controls-slot",
                 hx_swap="innerHTML",
@@ -149,9 +184,9 @@ def _stream_controls(running: bool) -> Any:
         )
 
     return Div(
-        cls="rounded-2xl border border-slate-600/50 bg-slate-800/80 p-6 backdrop-blur-sm",
+        cls="sentinel-panel-opaque rounded-2xl border border-slate-500 bg-slate-700 p-6",
     )(
-        H2("Live transaction stream", cls="text-lg font-bold text-white"),
+        H2("Live transaction stream", cls=KPI_LABEL_CLS),
         P(
             "HTMX polling across 3 walls — Rules, XGBoost, Anomaly Detection.",
             cls="mt-2 text-sm text-slate-400",
@@ -179,7 +214,7 @@ def _transaction_feed_container(running: bool) -> Any:
         cls=base_cls + " min-h-[120px] flex items-center justify-center",
         hx_swap_oob="true",
     )(
-        P("Waiting for the first tick…", cls="text-sm text-slate-500"),
+        P("Waiting for the first tick…", cls="text-sm font-bold text-slate-500"),
     )
 
 
