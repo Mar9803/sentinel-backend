@@ -88,17 +88,17 @@ def _kpi_panel() -> Any:
         cls="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4",
         hx_swap_oob="true",
     )(
-        _kpi_card("kpi-analyzed", "Transazioni analizzate", str(m.transactions_analyzed), "text-white"),
+        _kpi_card("kpi-analyzed", "Transactions analyzed", str(m.transactions_analyzed), "text-white"),
         _kpi_card(
             "kpi-losses-avoided",
-            "Perdite evitate",
+            "Losses avoided",
             f"€ {m.losses_avoided_eur:,.2f}",
             "text-emerald-400",
         ),
-        _kpi_card("kpi-damages", "Danni subiti", f"€ {m.damages_eur:,.2f}", "text-red-400"),
+        _kpi_card("kpi-damages", "Losses incurred", f"€ {m.damages_eur:,.2f}", "text-red-400"),
         _kpi_card(
             "kpi-vanity-accuracy",
-            "Accuratezza di facciata",
+            "Vanity accuracy",
             f"{m.vanity_accuracy_pct:.1f}%",
             "text-amber-300",
         ),
@@ -109,7 +109,7 @@ def _stream_controls(running: bool) -> Any:
     if running:
         buttons = Div(cls="mt-4 flex flex-wrap gap-3")(
             Button(
-                "⏹ Ferma flusso",
+                "⏹ Stop stream",
                 cls=(
                     "rounded-xl bg-red-600 px-5 py-2.5 text-sm font-semibold text-white "
                     "shadow-md hover:bg-red-700 transition"
@@ -119,14 +119,14 @@ def _stream_controls(running: bool) -> Any:
                 hx_swap="innerHTML",
             ),
             Span(
-                "Polling attivo · 1 tick/s",
+                "Active polling · 1 tick/s",
                 cls="inline-flex items-center rounded-full bg-emerald-900/50 px-3 py-1 text-xs text-emerald-300",
             ),
         )
     else:
         buttons = Div(cls="mt-4 flex flex-wrap gap-3")(
             Button(
-                "▶ Avvia flusso",
+                "▶ Start stream",
                 cls=(
                     "rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white "
                     "shadow-md hover:bg-emerald-700 transition"
@@ -134,9 +134,10 @@ def _stream_controls(running: bool) -> Any:
                 hx_post=_p("/stream/start"),
                 hx_target="#stream-controls-slot",
                 hx_swap="innerHTML",
+                hx_indicator="#stream-boot-loading",
             ),
             Button(
-                "↻ Reset metriche",
+                "↻ Reset metrics",
                 cls=(
                     "rounded-xl border border-slate-500 px-5 py-2.5 text-sm "
                     "font-semibold text-slate-300 hover:bg-slate-700 transition"
@@ -150,9 +151,9 @@ def _stream_controls(running: bool) -> Any:
     return Div(
         cls="rounded-2xl border border-slate-600/50 bg-slate-800/80 p-6 backdrop-blur-sm",
     )(
-        H2("Flusso transazioni live", cls="text-lg font-bold text-white"),
+        H2("Live transaction stream", cls="text-lg font-bold text-white"),
         P(
-            "HTMX polling sui 3 Muri — Regole, XGBoost, Anomaly Detection.",
+            "HTMX polling across 3 walls — Rules, XGBoost, Anomaly Detection.",
             cls="mt-2 text-sm text-slate-400",
         ),
         buttons,
@@ -178,13 +179,13 @@ def _transaction_feed_container(running: bool) -> Any:
         cls=base_cls + " min-h-[120px] flex items-center justify-center",
         hx_swap_oob="true",
     )(
-        P("In attesa del primo tick…", cls="text-sm text-slate-500"),
+        P("Waiting for the first tick…", cls="text-sm text-slate-500"),
     )
 
 
 def _feed_row(payload: dict[str, Any], result: dict[str, Any]) -> Any:
     meta = payload.get("_stream_meta", {})
-    profile = meta.get("label", "Transazione")
+    profile = meta.get("label", "Transaction")
     decision = result.get("decision", "PASS")
     amount = payload.get("amount", 0)
     is_block = decision == "BLOCK"
@@ -219,7 +220,7 @@ def _feed_row(payload: dict[str, Any], result: dict[str, Any]) -> Any:
 
 
 def _format_score(value: float | None) -> str:
-    return "N/D" if value is None else f"{value:.4f}"
+    return "N/A" if value is None else f"{value:.4f}"
 
 
 def _score_bar_colors(value: float | None) -> tuple[str, str, int]:
@@ -260,8 +261,28 @@ def _loading_indicator() -> Any:
             ),
         ),
         P(
-            "🛡️ I 3 Muri stanno analizzando la transazione...",
+            "🛡️ The 3 walls are analyzing the transaction…",
             cls="mt-6 animate-pulse text-lg font-semibold text-emerald-300",
+        ),
+    )
+
+
+def _stream_boot_loader() -> Any:
+    return Div(
+        id="stream-boot-loading",
+        cls=(
+            "htmx-indicator rounded-xl border border-slate-600/60 "
+            "bg-slate-800/90 px-4 py-3 shadow-md"
+        ),
+    )(
+        Div(cls="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4")(
+            P(
+                "Request sent — waking up the anti-fraud engine…",
+                cls="text-sm font-medium text-emerald-300 sm:shrink-0",
+            ),
+            Div(cls="h-2.5 min-w-[120px] flex-1 overflow-hidden rounded-full bg-gray-700")(
+                Div(cls="h-full w-full rounded-full bg-emerald-400 animate-pulse"),
+            ),
         ),
     )
 
@@ -287,7 +308,7 @@ def _payload_inspector(payload: dict[str, Any]) -> Any:
     formatted = json.dumps(_serialize_payload(payload), indent=2, ensure_ascii=False)
     return Details(cls="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-gray-50")(
         Summary(
-            "🔍 Ispeziona Payload Tecnico Transazione",
+            "🔍 Inspect transaction technical payload",
             cls="cursor-pointer select-none px-5 py-4 text-sm font-semibold text-gray-700",
         ),
         Pre(
@@ -314,10 +335,10 @@ def _rules_panel(rules: dict) -> Any:
             *[Li(n.replace("_", " ").title()) for n in triggered]
         )
         if triggered
-        else P("Nessuna regola scattata.", cls="mt-2 text-sm text-gray-500")
+        else P("No rules triggered.", cls="mt-2 text-sm text-gray-500")
     )
     return Div(cls="rounded-xl border border-gray-200 bg-gray-50 p-5")(
-        H4("Dettagli Regole", cls="text-sm font-bold uppercase text-gray-500"),
+        H4("Rule details", cls="text-sm font-bold uppercase text-gray-500"),
         P(f"ml_bypassed: {ml_bypassed}", cls="mt-2 font-mono text-sm"),
         rules_list,
     )
@@ -347,7 +368,7 @@ def render_transaction_result(label: str, result: dict, payload: dict[str, Any])
         hx_swap_oob="true",
     )(
         Div(cls="border-b border-gray-100 pb-4")(
-            H3(f"Ultima analisi — {label}", cls="text-xl font-bold text-gray-900"),
+            H3(f"Latest analysis — {label}", cls="text-xl font-bold text-gray-900"),
             P(
                 f"{result.get('transaction_id')} · score {result.get('final_score', 0):.4f}",
                 cls="font-mono text-xs text-gray-500",
@@ -368,14 +389,18 @@ def _dashboard_core() -> Any:
     return Div(id="sentinel-simulation-widget", cls="w-full")(
         _kpi_panel(),
         Div(id="stream-controls-slot")(_stream_controls(running=False)),
+        _stream_boot_loader(),
         Div(cls="mt-6")(
-            H3("Feed transazioni", cls="text-sm font-bold uppercase tracking-wider text-slate-400"),
+            H3("Transaction feed", cls="text-sm font-bold uppercase tracking-wider text-slate-400"),
             _transaction_feed_container(running=False),
         ),
         Div(cls="mt-10 space-y-4")(
             _loading_indicator(),
             Div(id="simulation-results")(
-                P("Dettaglio ultima transazione…", cls="text-center text-sm text-slate-500 py-6"),
+                P(
+                    "Latest transaction details will appear here after each tick.",
+                    cls="text-center text-sm text-slate-500 py-6",
+                ),
             ),
         ),
     )
@@ -405,7 +430,7 @@ def dashboard_home():
                         cls="text-3xl font-extrabold text-white md:text-4xl",
                     ),
                     P(
-                        "Flusso continuo · HTMX polling · 3 Muri difensivi",
+                        "Continuous stream · HTMX polling · 3 defensive walls",
                         cls="mx-auto mt-3 max-w-2xl text-sm text-slate-300",
                     ),
                 ),
