@@ -17,6 +17,7 @@ app = FastAPI(title="SentinelGraph API")
 # --- CONFIGURAZIONE CORS ---
 # Origini esplicite per sviluppo locale (Astro + dashboard FastHTML + API diretta)
 CORS_ORIGINS = [
+    "https://mar9803.github.io",
     "http://localhost:4321",
     "http://127.0.0.1:4321",
     "http://localhost:8000",
@@ -28,8 +29,17 @@ CORS_ORIGINS = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=True,
+    # Permettiamo solo i metodi necessari alle tue dashboard
+    allow_methods=["GET", "POST"],
+    # Principio del privilegio minimo: accettiamo solo gli header standard + HTMX
+    allow_headers=[
+        "Content-Type",
+        "HX-Request",
+        "HX-Trigger",
+        "HX-Target",
+        "HX-Current-URL"
+    ],
 )
 
 # Inizializzazione detector, graph_engine, engineer
